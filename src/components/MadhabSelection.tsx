@@ -56,7 +56,7 @@ export default function MadhabSelection() {
 
         <p className="text-xs text-gray-400 text-center mt-6 leading-relaxed">
           Bu uygulama yalnızca bilgi amaçlıdır.<br />
-          Şüphe durumlarında mutlaka bir âlime danışınız.
+          Şüphe durumlarında kitaptan okuyunuz ya da bir bilene sorunuz.
         </p>
       </div>
     </div>

@@ -6,13 +6,21 @@
  * TEMEL KURALLAR (Hanefi Mezhebi):
  * ─────────────────────────────────
  * 1. Hayız en az 3 gün (72 saat), en çok 10 gün (240 saat) sürer.
- * 2. Temizlik (tuhr) en az 15 gündür.
- * 3. Kanama 10 günü aşarsa → âdet-i mu'tâde'ye (alışılmış süreye) bakılır.
+ * 2. Temizlik müddeti en az 15 gündür.
+ * 3. Kanama 10 günü aşarsa → hayız müddetine bakılır.
  * 4. Yeni kanamanın önceki hayızla 3+ gün örtüşmesi varsa → yeni hayız geçerlidir.
- * 5. Örtüşme 3 günden azsa → önceki âdete dönülür; fazla günler istihâzadır.
+ * 5. Örtüşme 3 günden azsa → önceki hayız müddetine dönülür; fazla günler istihâzadır.
+ * 6. İki hayız arasında en az 15 gün temizlik müddeti olmalıdır.
+ * 7. Fasılalı kanama (ara verip devam eden kanama) 10 gün içinde değerlendirilir.
+ *
+ * MÂLİKÎ TAKLİDİ:
+ * ─────────────────
+ * 8. Mâlikî mezhebinde hayızın azamî süresi 15 gündür.
+ *    Mâlikî'yi taklit eden Hanefî kadınlar için kanama 15 güne kadar
+ *    tamamen hayız sayılabilir.
  *
  * NOT: Bu modül yalnızca bilgi amaçlıdır.
- * Şüphe durumlarında mutlaka bir âlime danışınız.
+ * Şüphe durumlarında kitaptan okuyunuz ya da bir bilene sorunuz.
  */
 
 import {
@@ -82,12 +90,17 @@ function createQadaDays(dates: string[]): QadaDay[] {
   }));
 }
 
+/** Mezhebe göre azamî hayız süresini döndürür */
+function getMaxHayzDays(madhab: MadhabPreference): number {
+  return madhab === 'maliki_taklid' ? 15 : 10;
+}
+
 // ─── Ana Hesaplama Fonksiyonu ───
 
 /**
  * Hayız / İstihâza hesaplamasını gerçekleştirir.
  *
- * @param currentBleeding - Bu ayki kanama kaydı
+ * @param currentBleeding - Bu ayki kanama kaydı (fasılalı kanamalar dahil)
  * @param previousMonth  - Önceki ay verileri
  * @param madhab         - Mezhep tercihi
  * @returns Hesaplama sonucu
@@ -99,13 +112,87 @@ export function calculateHayzIstihadha(
 ): CalculationResult {
   const notes: string[] = [];
   let needsScholarConsultation = false;
+  const maxHayzDays = getMaxHayzDays(madhab);
 
   const bleedStart = toDate(currentBleeding.startDateTime);
   const bleedEnd = currentBleeding.endDateTime
     ? toDate(currentBleeding.endDateTime)
     : new Date(); // Devam ediyorsa şu anki zamana kadar hesapla
 
+  // ═══════════════════════════════════════
+  // KURAL 6: Temizlik müddeti kontrolü (en az 15 gün)
+  // ═══════════════════════════════════════
+  if (previousMonth) {
+    const prevHayzEnd = toDate(previousMonth.hayzEnd);
+    const tuhrDays = daysBetween(prevHayzEnd, bleedStart);
+
+    if (tuhrDays < 15) {
+      notes.push(
+        `Önceki hayız bitişi ile bu kanamanın başlangıcı arasında ${tuhrDays.toFixed(1)} gün var. ` +
+        `İki hayız arasında en az 15 gün temizlik müddeti olmalıdır. ` +
+        `Bu kanama ayrı bir hayız olarak değerlendirilemez.`
+      );
+
+      // Önceki hayızla birleştir ve toplam süreyi kontrol et
+      const prevHayzStart = toDate(previousMonth.hayzStart);
+      const combinedDays = daysBetween(prevHayzStart, bleedEnd);
+
+      if (combinedDays <= maxHayzDays) {
+        notes.push(
+          `Önceki hayızla birlikte toplam süre ${combinedDays.toFixed(1)} gün olup ` +
+          `${maxHayzDays} günü aşmadığından tamamı hayız sayılır.`
+        );
+        return {
+          hayzDays: [{ start: toISOStr(prevHayzStart), end: toISOStr(bleedEnd) }],
+          istihadhaDays: [],
+          isNewHayzConfirmed: true,
+          updatedHayzDuration: Math.round(combinedDays),
+          qadaDays: [],
+          notes,
+          needsScholarConsultation: false,
+        };
+      } else {
+        // Birleşik süre azamîyi aştı → hayız müddetine göre hesapla
+        const hayzMuddeti = previousMonth.hayzDuration;
+        const hayzEndDate = addDays(prevHayzStart, hayzMuddeti);
+        const istihadhaStart = hayzEndDate;
+        const istihadhaDates = getDateList(istihadhaStart, bleedEnd);
+        const qadaDays = createQadaDays(istihadhaDates);
+
+        notes.push(
+          `Birleşik süre ${combinedDays.toFixed(1)} gün olup ${maxHayzDays} günü aştığından, ` +
+          `hayız müddeti olan ${hayzMuddeti} gün hayız, geri kalan istihâzadır.`
+        );
+
+        return {
+          hayzDays: [{ start: toISOStr(prevHayzStart), end: toISOStr(hayzEndDate) }],
+          istihadhaDays: istihadhaDates.length > 0
+            ? [{ start: toISOStr(istihadhaStart), end: toISOStr(bleedEnd) }]
+            : [],
+          isNewHayzConfirmed: false,
+          updatedHayzDuration: null,
+          qadaDays,
+          notes,
+          needsScholarConsultation: false,
+        };
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // Fasılalı kanama: arada duruş varsa 10 (veya 15) gün içinde değerlendir
+  // ═══════════════════════════════════════
   const totalBleedingDays = daysBetween(bleedStart, bleedEnd);
+
+  // Fasılalı kanama desteği: intermittentBleedingPeriods varsa
+  // toplam kanama süresi başlangıçtan bitişe kadar olan süre olarak alınır
+  // (arada temiz günler olsa bile 10/15 günlük pencere içinde hayız sayılır)
+  if (currentBleeding.intermittentPeriods && currentBleeding.intermittentPeriods.length > 0) {
+    notes.push(
+      'Fasılalı kanama (ara verip devam eden kanama) tespit edilmiştir. ' +
+      `Başlangıçtan bitişe kadar olan ${totalBleedingDays.toFixed(1)} günlük süre değerlendirilmektedir.`
+    );
+  }
 
   // ═══════════════════════════════════════
   // KURAL 1: Kanama 3 günden az mı?
@@ -116,28 +203,37 @@ export function calculateHayzIstihadha(
       hayzDays: [],
       istihadhaDays: [{ start: toISOStr(bleedStart), end: toISOStr(bleedEnd) }],
       isNewHayzConfirmed: false,
-      updatedMutad: null,
-      qadaDays: [],
+      updatedHayzDuration: null,
+      qadaDays: createQadaDays(getDateList(bleedStart, bleedEnd)),
       notes,
       needsScholarConsultation: false,
     };
   }
 
   // ═══════════════════════════════════════
-  // KURAL 2: Kanama 10 gün veya altında mı?
-  // → Tamamı hayızdır.
+  // KURAL 2: Kanama azamî süre veya altında mı?
+  // Hanefî: ≤ 10 gün → Tamamı hayız
+  // Mâlikî taklidi: ≤ 15 gün → Tamamı hayız
   // ═══════════════════════════════════════
-  if (totalBleedingDays <= 10) {
-    const hayzDates = getDateList(bleedStart, bleedEnd);
-    notes.push(`Kanama ${totalBleedingDays.toFixed(1)} gün sürmüştür. 10 günü aşmadığı için tamamı hayızdır.`);
+  if (totalBleedingDays <= maxHayzDays) {
+    notes.push(
+      `Kanama ${totalBleedingDays.toFixed(1)} gün sürmüştür. ` +
+      `${maxHayzDays} günü aşmadığı için tamamı hayızdır.`
+    );
 
-    // İstihâza günlerini hesapla (hayız bitişinden sonraki günlerde kaza yapılacak)
-    // Hayız süresince namaz kılınmaz, kaza da edilmez
+    if (madhab === 'maliki_taklid' && totalBleedingDays > 10) {
+      notes.push(
+        `Hanefî mezhebine göre azamî hayız 10 gündür, ancak Mâlikî mezhebini taklit ettiğiniz için ` +
+        `${totalBleedingDays.toFixed(1)} güne kadar hayız kabul edilmektedir. ` +
+        `Taklit şartlarına dikkat ediniz; kitaptan okuyunuz ya da bir bilene sorunuz.`
+      );
+    }
+
     return {
       hayzDays: [{ start: toISOStr(bleedStart), end: toISOStr(bleedEnd) }],
       istihadhaDays: [],
       isNewHayzConfirmed: true,
-      updatedMutad: Math.round(totalBleedingDays),
+      updatedHayzDuration: Math.round(totalBleedingDays),
       qadaDays: [], // Hayız günlerinde namaz düşer, kaza gerekmez
       notes,
       needsScholarConsultation: false,
@@ -145,60 +241,76 @@ export function calculateHayzIstihadha(
   }
 
   // ═══════════════════════════════════════
-  // KURAL 3: Kanama 10 günü aştı
-  // → Âdet-i mu'tâde'ye bakılır.
+  // KURAL 3: Kanama azamî süreyi aştı
+  // → Hayız müddetine bakılır
   // ═══════════════════════════════════════
-  notes.push(`Kanama ${totalBleedingDays.toFixed(1)} gün sürmüş olup 10 günü aşmıştır. Âdet-i mu'tâde'ye göre hesaplama yapılacaktır.`);
+  notes.push(
+    `Kanama ${totalBleedingDays.toFixed(1)} gün sürmüş olup ${maxHayzDays} günü aşmıştır. ` +
+    `Hayız müddetine göre hesaplama yapılacaktır.`
+  );
 
+  // ─── Mübtedia (ilk defa hayız gören veya önceki verisi olmayan) ───
   if (!previousMonth) {
-    // Önceki ay verisi yoksa, varsayılan olarak belirsiz durum
-    notes.push('Önceki ay verisi girilmediği için kesin hesaplama yapılamamaktadır.');
-    notes.push('Bu konuda bir âlime danışmanız tavsiye edilir.');
-    needsScholarConsultation = true;
+    notes.push(
+      'Önceki ay verisi bulunmadığından mübtedia (ilk kez âdet gören) olarak değerlendirilmektedir.'
+    );
 
-    // En güvenli yol: İlk 10 günü hayız, kalanını istihâza say
-    const hayzEnd10 = addDays(bleedStart, 10);
-    const istihadhaStart = hayzEnd10;
-    const hayzDates = getDateList(bleedStart, hayzEnd10);
-
-    // İstihâza günlerinde namaz kılınmalıdır; kılınmadıysa kaza gerekir
+    // Mübtedia için Hanefî hükmü:
+    // İlk hayız azamî süre (10 gün Hanefî / 15 gün Mâlikî taklidi) kabul edilir
+    const hayzEnd = addDays(bleedStart, maxHayzDays);
+    const istihadhaStart = hayzEnd;
     const istihadhaDates = getDateList(istihadhaStart, bleedEnd);
     const qadaDays = createQadaDays(istihadhaDates);
 
+    notes.push(
+      `Mübtedia olarak ilk ${maxHayzDays} gün hayız, kalan ${istihadhaDates.length} gün istihâza sayılır.`
+    );
+    notes.push(
+      'İstihâza günlerinde kılınmayan namazlar kaza edilecektir.'
+    );
+    notes.push(
+      'Bu konuda kitaptan okuyunuz ya da bir bilene sorunuz.'
+    );
+    needsScholarConsultation = true;
+
     return {
-      hayzDays: [{ start: toISOStr(bleedStart), end: toISOStr(hayzEnd10) }],
-      istihadhaDays: [{ start: toISOStr(istihadhaStart), end: toISOStr(bleedEnd) }],
+      hayzDays: [{ start: toISOStr(bleedStart), end: toISOStr(hayzEnd) }],
+      istihadhaDays: istihadhaDates.length > 0
+        ? [{ start: toISOStr(istihadhaStart), end: toISOStr(bleedEnd) }]
+        : [],
       isNewHayzConfirmed: false,
-      updatedMutad: null,
+      updatedHayzDuration: maxHayzDays,
       qadaDays,
       notes,
       needsScholarConsultation,
     };
   }
 
-  const mutadDays = previousMonth.mutadDays;
+  // ─── Mu'tâde (düzenli âdeti olan) ───
+  const hayzMuddeti = previousMonth.hayzDuration;
   const prevHayzStart = toDate(previousMonth.hayzStart);
   const prevHayzEnd = toDate(previousMonth.hayzEnd);
 
   // ═══════════════════════════════════════
-  // KURAL 3a: Önceki hayızla örtüşme kontrolü
-  // "Yeni kanamanın başlangıcından itibaren, önceki hayız
-  //  günleriyle 3+ gün örtüşüyorsa yeni hayız geçerlidir."
+  // KURAL 4: Önceki hayızla döngüsel örtüşme kontrolü
+  // Döngü uzunluğuna göre hesaplanır (hayız + temizlik müddeti)
   // ═══════════════════════════════════════
-
-  // Önceki hayızın ayın hangi günlerinde olduğunu belirle
-  // ve yeni kanamayla karşılaştır (gün-of-month bazında)
-  const overlap = calculateCyclicOverlap(bleedStart, bleedEnd, prevHayzStart, prevHayzEnd);
+  const overlap = calculateCyclicOverlap(
+    bleedStart, bleedEnd,
+    prevHayzStart, prevHayzEnd,
+    previousMonth.tuhrStart ? toDate(previousMonth.tuhrStart) : prevHayzEnd,
+    previousMonth.tuhrEnd ? toDate(previousMonth.tuhrEnd) : bleedStart
+  );
 
   if (overlap >= 3) {
     // ─── Yeni hayız geçerlidir ───
     notes.push(
-      `Önceki hayız günleriyle ${overlap.toFixed(1)} gün örtüşme tespit edilmiştir (≥ 3 gün). ` +
+      `Önceki hayız günleriyle ${overlap.toFixed(1)} gün örtüşme tespit edilmiştir (>= 3 gün). ` +
       `Yeni hayız geçerlidir.`
     );
 
-    // Hayız = mu'tâd kadar gün, kalan = istihâza
-    const hayzEndDate = addDays(bleedStart, mutadDays);
+    // Hayız = hayız müddeti kadar gün, kalan = istihâza
+    const hayzEndDate = addDays(bleedStart, hayzMuddeti);
     const istihadhaStart = hayzEndDate;
 
     const istihadhaDates = getDateList(istihadhaStart, bleedEnd);
@@ -206,25 +318,21 @@ export function calculateHayzIstihadha(
 
     if (istihadhaDates.length > 0) {
       notes.push(
-        `İlk ${mutadDays} gün hayız, geri kalan ${istihadhaDates.length} gün istihâzadır. ` +
+        `İlk ${hayzMuddeti} gün hayız, geri kalan ${istihadhaDates.length} gün istihâzadır. ` +
         `İstihâza günlerinde kılınmayan namazlar kaza edilecektir.`
       );
     }
 
-    // Mâlikî taklidi durumunda ek not
     if (madhab === 'maliki_taklid') {
       notes.push(
         'Mâlikî mezhebini taklit eden Hanefî hesabına göre işlem yapılmıştır. ' +
-        'Mâlikî mezhebinde hayızın azamî süresi 15 gündür. ' +
-        'Ancak taklit şartlarına dikkat edilmelidir.'
+        'Mâlikî mezhebinde hayızın azamî süresi 15 gündür.'
       );
 
-      // Mâlikî'de azamî 15 gün; eğer kanama 10-15 gün arasındaysa
-      // ve taklit ediliyorsa tamamı hayız olabilir
       if (totalBleedingDays <= 15) {
         notes.push(
-          'Mâlikî mezhebine göre bu kanama süresi (≤ 15 gün) tamamen hayız sayılabilir. ' +
-          'Ancak taklit şartlarını bir âlimle değerlendirmeniz tavsiye edilir.'
+          'Mâlikî mezhebine göre bu kanama süresi (<= 15 gün) tamamen hayız sayılabilir. ' +
+          'Taklit şartlarını kitaptan okuyunuz ya da bir bilene sorunuz.'
         );
         needsScholarConsultation = true;
       }
@@ -236,7 +344,7 @@ export function calculateHayzIstihadha(
         ? [{ start: toISOStr(istihadhaStart), end: toISOStr(bleedEnd) }]
         : [],
       isNewHayzConfirmed: true,
-      updatedMutad: mutadDays, // Mu'tâd güncellenmez, aynı kalır
+      updatedHayzDuration: hayzMuddeti, // Hayız müddeti aynı kalır
       qadaDays,
       notes,
       needsScholarConsultation,
@@ -244,30 +352,30 @@ export function calculateHayzIstihadha(
   }
 
   // ═══════════════════════════════════════
-  // KURAL 3b: Örtüşme 3 günden az
-  // → Önceki âdete (mu'tâd) dönülür.
-  // → Mu'tâd kadar gün hayız, kalan istihâza.
+  // KURAL 5: Örtüşme 3 günden az
+  // → Önceki hayız müddetine dönülür
+  // → Hayız müddeti kadar gün hayız, kalan istihâza
   // ═══════════════════════════════════════
   notes.push(
     `Önceki hayız günleriyle örtüşme ${overlap.toFixed(1)} gün olup 3 günden azdır. ` +
-    `Önceki âdet-i mu'tâde'ye (${mutadDays} gün) dönülür.`
+    `Önceki hayız müddetine (${hayzMuddeti} gün) dönülür.`
   );
 
-  const hayzEndByMutad = addDays(bleedStart, mutadDays);
+  const hayzEndByMutad = addDays(bleedStart, hayzMuddeti);
   const istihadhaStartByMutad = hayzEndByMutad;
 
   const istihadhaDates = getDateList(istihadhaStartByMutad, bleedEnd);
   const qadaDays = createQadaDays(istihadhaDates);
 
   notes.push(
-    `İlk ${mutadDays} gün hayız sayılır, ${istihadhaDates.length} gün istihâza sayılır. ` +
+    `İlk ${hayzMuddeti} gün hayız sayılır, ${istihadhaDates.length} gün istihâza sayılır. ` +
     `İstihâza günlerinde kılınmayan namazlar kaza edilecektir.`
   );
 
   if (madhab === 'maliki_taklid') {
     notes.push(
       'Mâlikî mezhebini taklit etme durumunda farklı hükümler geçerli olabilir. ' +
-      'Bu konuda bir âlime danışmanız tavsiye edilir.'
+      'Bu konuda kitaptan okuyunuz ya da bir bilene sorunuz.'
     );
     needsScholarConsultation = true;
   }
@@ -276,7 +384,7 @@ export function calculateHayzIstihadha(
     hayzDays: [{ start: toISOStr(bleedStart), end: toISOStr(hayzEndByMutad) }],
     istihadhaDays: [{ start: toISOStr(istihadhaStartByMutad), end: toISOStr(bleedEnd) }],
     isNewHayzConfirmed: false,
-    updatedMutad: null,
+    updatedHayzDuration: null,
     qadaDays,
     notes,
     needsScholarConsultation,
@@ -286,42 +394,44 @@ export function calculateHayzIstihadha(
 /**
  * İki kanama döneminin döngüsel örtüşmesini hesaplar.
  *
- * Önceki hayızın ay içindeki konumunu (gün numaraları) alır ve
- * yeni kanamanın aynı pozisyondaki günleriyle karşılaştırır.
- *
- * Basitleştirilmiş yaklaşım: Her iki dönemin başlangıç günü
- * farkını hesaplayarak örtüşme gün sayısını bulur.
+ * Döngü uzunluğu = önceki hayız süresi + temizlik müddeti süresi
+ * Yeni kanamanın başlangıcını döngü içindeki pozisyonuna göre
+ * önceki hayız günleriyle karşılaştırır.
  */
 function calculateCyclicOverlap(
   newStart: Date,
   newEnd: Date,
-  prevStart: Date,
-  prevEnd: Date
+  prevHayzStart: Date,
+  prevHayzEnd: Date,
+  tuhrStart: Date,
+  tuhrEnd: Date
 ): number {
-  // Önceki hayızın gün aralığını hesapla
-  const prevDuration = daysBetween(prevStart, prevEnd);
+  const prevHayzDuration = daysBetween(prevHayzStart, prevHayzEnd);
+  const tuhrDuration = daysBetween(tuhrStart, tuhrEnd);
 
-  // Yeni kanamanın başlangıcından itibaren, önceki hayız
-  // günlerinin ay içindeki pozisyonuyla karşılaştır.
-  // Basitleştirilmiş: prevStart'ın ay-içi gün pozisyonunu al,
-  // newStart'ın ay-içi gün pozisyonunu al, farkı hesapla.
-  const prevDayOfMonth = prevStart.getDate();
-  const newDayOfMonth = newStart.getDate();
+  // Döngü uzunluğu = hayız + temizlik müddeti
+  const cycleLength = prevHayzDuration + tuhrDuration;
 
-  // Önceki hayızın gün aralığı (ay-içi gün numaraları)
-  const prevDays: number[] = [];
-  for (let i = 0; i < prevDuration; i++) {
-    prevDays.push(prevDayOfMonth + i);
+  if (cycleLength <= 0) {
+    // Döngü hesaplanamıyorsa, doğrudan tarih bazlı örtüşme yap
+    return overlapDays(newStart, newEnd, prevHayzStart, prevHayzEnd);
   }
 
-  // Yeni kanamanın gün aralığı
+  // Yeni kanamanın başlangıcının döngü içindeki pozisyonunu hesapla
+  const daysSincePrevHayzStart = daysBetween(prevHayzStart, newStart);
+  const positionInCycle = ((daysSincePrevHayzStart % cycleLength) + cycleLength) % cycleLength;
+
+  // Yeni kanamanın döngü içindeki hayız günleriyle örtüşmesini hesapla
+  // Hayız günleri döngünün 0 ile prevHayzDuration arasındaki kısmı
   const newDuration = Math.min(daysBetween(newStart, newEnd), 31);
-  const newDays: number[] = [];
+
+  let overlapCount = 0;
   for (let i = 0; i < newDuration; i++) {
-    newDays.push(newDayOfMonth + i);
+    const dayPosition = ((positionInCycle + i) % cycleLength + cycleLength) % cycleLength;
+    if (dayPosition < prevHayzDuration) {
+      overlapCount++;
+    }
   }
 
-  // Örtüşen günleri say
-  const overlap = prevDays.filter(d => newDays.includes(d)).length;
-  return overlap;
+  return overlapCount;
 }

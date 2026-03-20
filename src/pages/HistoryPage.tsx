@@ -99,7 +99,7 @@ export default function HistoryPage() {
                   }`}>
                     {record.calculationResult.isNewHayzConfirmed
                       ? '✓ Hayız onaylandı'
-                      : '○ Önceki âdete dönüldü'}
+                      : '○ Önceki hayız müddetine dönüldü'}
                   </div>
                 </>
               )}

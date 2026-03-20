@@ -89,8 +89,8 @@ export default function ContactPage() {
             <em> Hanımlara Rehber</em> (Hasan Yavaş) kaynaklarına dayanmaktadır.
           </p>
           <p>
-            Tüm verileriniz yalnızca cihazınızda saklanır. Hiçbir veri
-            dış sunuculara gönderilmez.
+            Verileriniz cihazınızda saklanır ve e-posta adresiniz aracılığıyla
+            farklı cihazlardan erişilebilir.
           </p>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function ContactPage() {
       <div className="card mt-4 bg-gray-50/50">
         <p className="text-xs text-gray-500 text-center leading-relaxed">
           Bu uygulama yalnızca bilgi amaçlıdır ve fıkhî fetva niteliği taşımaz.<br />
-          Şüphe durumlarında mutlaka bir âlime danışınız.
+          Şüphe durumlarında kitaptan okuyunuz ya da bir bilene sorunuz.
         </p>
       </div>
     </div>

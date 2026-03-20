@@ -45,18 +45,18 @@ export default function MethodPage() {
             </div>
 
             <div>
-              <h3 className="font-medium text-gray-700 mb-1">2. Temizlik (Tuhr) Süresi</h3>
+              <h3 className="font-medium text-gray-700 mb-1">2. Temizlik Müddeti</h3>
               <p>
-                İki hayız arasındaki temizlik süresinin en azı <strong>15 gün</strong>dür.
-                15 günden kısa olan temizlik süresi geçerli sayılmaz.
+                İki hayız arasındaki temizlik müddetinin en azı <strong>15 gün</strong>dür.
+                15 günden kısa olan temizlik müddeti geçerli sayılmaz.
               </p>
             </div>
 
             <div>
               <h3 className="font-medium text-gray-700 mb-1">3. Kanama 10 Günü Aşarsa</h3>
               <p>
-                Kanama 10 günü aştığında, <strong>âdet-i mu'tâde</strong>'ye (alışılmış hayız
-                süresine) bakılır. Mu'tâd süre kadar olan kısım hayız, geri kalanı
+                Kanama 10 günü aştığında, <strong>hayız müddeti</strong>ne (alışılmış hayız
+                süresine) bakılır. Hayız müddeti kadar olan kısım hayız, geri kalanı
                 istihâza (özür kanı) sayılır.
               </p>
             </div>
@@ -66,7 +66,7 @@ export default function MethodPage() {
               <p>
                 Yeni kanamanın önceki hayız günleriyle <strong>3 veya daha fazla gün</strong> örtüşmesi
                 durumunda yeni hayız geçerli kabul edilir. Örtüşme 3 günden azsa, önceki
-                âdete dönülür.
+                hayız müddetine dönülür.
               </p>
             </div>
 
@@ -75,6 +75,24 @@ export default function MethodPage() {
               <p>
                 İstihâza günlerinde namaz kılınmalıdır. Bu günlerde namaz kılınmadıysa
                 kaza edilmesi gerekir. İstihâzalı kadın her namaz vakti için abdest alır.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-medium text-gray-700 mb-1">6. Fasılalı Kanama</h3>
+              <p>
+                Kanama ara verip tekrar başlarsa, başlangıçtan bitişe kadar olan süre
+                bir bütün olarak değerlendirilir. Toplam süre {state.madhab === 'maliki_taklid' ? '15' : '10'} günü
+                aşmadığı sürece tamamı hayız sayılır.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-medium text-gray-700 mb-1">7. Mübtedia ve Mu'tâde</h3>
+              <p>
+                İlk defa hayız gören (mübtedia) ile düzenli âdeti olan (mu'tâde) kadınlar
+                için farklı hükümler uygulanır. Mübtedia için hayız müddeti bilinmediğinden
+                azamî süre esas alınır.
               </p>
             </div>
           </div>
@@ -97,8 +115,13 @@ export default function MethodPage() {
                 mezhebini taklit edebilir. Bu taklit, belirli şartlara bağlıdır ve
                 bir bütün olarak yapılmalıdır.
               </p>
+              <p>
+                Mâlikî'yi taklit eden Hanefî kadınlar, en çok hayız gördükleri gün
+                sayısını <strong>15 güne kadar</strong> girebilirler. Bu durumda
+                10 ile 15 gün arasındaki kanamalar da istihâza sayılmaz, hayız kabul edilir.
+              </p>
               <p className="text-amber-600 font-medium">
-                ⚠ Mâlikî taklidi konusunda mutlaka bir âlime danışılması tavsiye edilir.
+                ⚠ Mâlikî taklidi konusunda kitaptan okuyunuz ya da bir bilene sorunuz.
               </p>
             </div>
           </div>
@@ -118,22 +141,26 @@ export default function MethodPage() {
               </li>
               <li className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-xs font-semibold">2</span>
-                <span>Süre ≤ 10 gün ise → Tamamı hayızdır.</span>
+                <span>İki hayız arasında en az 15 gün temizlik müddeti olup olmadığı kontrol edilir.</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-xs font-semibold">3</span>
-                <span>Süre {'>'} 10 gün ise → Önceki hayız verileriyle karşılaştırılır.</span>
+                <span>Süre {'<='} {state.madhab === 'maliki_taklid' ? '15' : '10'} gün ise → Tamamı hayızdır.</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-xs font-semibold">4</span>
-                <span>3+ gün örtüşme varsa → Yeni hayız geçerlidir, mu'tâd kadar gün hayız sayılır.</span>
+                <span>Süre {'>'} {state.madhab === 'maliki_taklid' ? '15' : '10'} gün ise → Önceki hayız verileriyle karşılaştırılır.</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-xs font-semibold">5</span>
-                <span>{'<'} 3 gün örtüşme → Önceki âdete dönülür.</span>
+                <span>3+ gün örtüşme varsa → Yeni hayız geçerlidir, hayız müddeti kadar gün hayız sayılır.</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-xs font-semibold">6</span>
+                <span>{'<'} 3 gün örtüşme → Önceki hayız müddetine dönülür.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-xs font-semibold">7</span>
                 <span>İstihâza günleri ve kaza namazları belirlenir.</span>
               </li>
             </ol>
@@ -145,7 +172,7 @@ export default function MethodPage() {
           <p className="text-xs text-gray-500 text-center leading-relaxed">
             Bu uygulama yalnızca bilgi amaçlıdır ve fıkhî fetva niteliği taşımaz.
             Hesaplamalar yukarıda belirtilen kaynaklara dayanmaktadır.
-            Şüphe durumlarında mutlaka bir âlime danışınız.
+            Şüphe durumlarında kitaptan okuyunuz ya da bir bilene sorunuz.
           </p>
         </div>
       </div>
