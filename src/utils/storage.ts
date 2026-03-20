@@ -2,7 +2,7 @@
  * localStorage yönetimi
  */
 
-import { AppState, MadhabPreference, MonthlyRecord, QadaDay } from '../types';
+import { AppState, MadhabPreference, MonthlyRecord, QadaDay, PreviousMonthData } from '../types';
 
 const STORAGE_KEY = 'ozel-gun-defterim';
 
@@ -10,13 +10,27 @@ const DEFAULT_STATE: AppState = {
   madhab: 'hanefi',
   records: [],
   qadaPrayers: [],
+  userEmail: null,
+  savedPreviousMonth: null,
 };
 
 export function loadState(): AppState {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) return DEFAULT_STATE;
-    return JSON.parse(data) as AppState;
+    const parsed = JSON.parse(data);
+    // Eski verilerle uyumluluk: yeni alanlar yoksa varsayılan değer ata
+    return {
+      ...DEFAULT_STATE,
+      ...parsed,
+      // mutadDays → hayzDuration göçü
+      savedPreviousMonth: parsed.savedPreviousMonth
+        ? {
+            ...parsed.savedPreviousMonth,
+            hayzDuration: parsed.savedPreviousMonth.hayzDuration ?? parsed.savedPreviousMonth.mutadDays ?? 6,
+          }
+        : null,
+    };
   } catch {
     return DEFAULT_STATE;
   }
@@ -55,11 +69,9 @@ export function deleteRecord(id: string): void {
 
 export function saveQadaPrayers(qadaPrayers: QadaDay[]): void {
   const state = loadState();
-  // Merge: mevcut kaza namazlarını güncelle veya yenilerini ekle
   for (const newDay of qadaPrayers) {
     const existingIdx = state.qadaPrayers.findIndex(d => d.date === newDay.date);
     if (existingIdx >= 0) {
-      // Mevcut namazları koru (completed durumlarını koruyarak)
       const existing = state.qadaPrayers[existingIdx];
       for (const prayer of newDay.prayers) {
         const existingPrayer = existing.prayers.find(p => p.name === prayer.name);
@@ -84,6 +96,18 @@ export function toggleQadaPrayer(date: string, prayerName: string): void {
       prayer.isCompleted = !prayer.isCompleted;
     }
   }
+  saveState(state);
+}
+
+export function saveUserEmail(email: string): void {
+  const state = loadState();
+  state.userEmail = email;
+  saveState(state);
+}
+
+export function savePreviousMonth(prevMonth: PreviousMonthData): void {
+  const state = loadState();
+  state.savedPreviousMonth = prevMonth;
   saveState(state);
 }
 

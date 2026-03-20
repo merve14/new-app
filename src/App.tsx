@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import TabBar from './components/TabBar';
+import EmailLogin from './components/EmailLogin';
 import MadhabSelection from './components/MadhabSelection';
 import HomePage from './pages/HomePage';
 import HistoryPage from './pages/HistoryPage';
@@ -24,6 +25,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen pb-24">
+      <EmailLogin />
       <MadhabSelection />
       <main className="max-w-lg mx-auto px-4 pt-6">
         {renderPage()}

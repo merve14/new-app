@@ -12,12 +12,20 @@ export type MadhabPreference = 'hanefi' | 'maliki_taklid';
 /** Tarih + saat birlikte (ISO string olarak saklanır) */
 export type DateTimeString = string;
 
+/** Fasılalı kanama dönemi */
+export interface IntermittentPeriod {
+  start: DateTimeString;
+  end: DateTimeString;
+}
+
 /** Kanama kaydı */
 export interface BleedingRecord {
   id: string;
   startDateTime: DateTimeString;
   endDateTime: DateTimeString | null; // null = devam ediyor
   isOngoing: boolean;
+  /** Fasılalı kanama dönemleri (ara verip devam eden kanama) */
+  intermittentPeriods?: IntermittentPeriod[];
 }
 
 /** Önceki ay verisi */
@@ -26,7 +34,8 @@ export interface PreviousMonthData {
   hayzEnd: DateTimeString;
   tuhrStart: DateTimeString;
   tuhrEnd: DateTimeString;
-  mutadDays: number; // Âdet-i mu'tâde (alışılmış hayız süresi, gün)
+  /** Hayız müddeti (alışılmış hayız süresi, gün) */
+  hayzDuration: number;
 }
 
 /** Hesaplama sonucu */
@@ -34,10 +43,11 @@ export interface CalculationResult {
   hayzDays: { start: DateTimeString; end: DateTimeString }[];
   istihadhaDays: { start: DateTimeString; end: DateTimeString }[];
   isNewHayzConfirmed: boolean;
-  updatedMutad: number | null;
+  /** Güncellenmiş hayız müddeti */
+  updatedHayzDuration: number | null;
   qadaDays: QadaDay[];
   notes: string[];
-  /** Belirsiz durumlarda âlime danışma uyarısı */
+  /** Belirsiz durumlarda kitaptan okuma / bilene sorma uyarısı */
   needsScholarConsultation: boolean;
 }
 
@@ -72,6 +82,10 @@ export interface AppState {
   madhab: MadhabPreference;
   records: MonthlyRecord[];
   qadaPrayers: QadaDay[];
+  /** Kullanıcı e-posta adresi (giriş ve veri senkronizasyonu için) */
+  userEmail: string | null;
+  /** Saklanan önceki ay verisi (sadece ilk kullanımda girilir, sonra otomatik kullanılır) */
+  savedPreviousMonth: PreviousMonthData | null;
 }
 
 /** Sekme tanımları */
